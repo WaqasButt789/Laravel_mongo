@@ -4,7 +4,8 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Services\DataBaseConnectionService;
+
 
 
 class CustomAuth
@@ -18,18 +19,17 @@ class CustomAuth
      */
     public function handle(Request $req, Closure $next)
     {
+        $coll=new DataBaseConnectionService();    
+        $table='users';   
+        $coll2=$coll->connection($table); 
         $key=$req->token;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-
-        if($numrows == 1)
-            {
-        return $next($req);
-            }
-
-            else {
-
-                return response(["Message" => "you are not logIn"]);
-            }
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        if($data!=NULL)
+        {
+            return $next($req);
+        }
+        else{
+            return response(["Message" => "you are not logIn"]);
+        }
     }
 }

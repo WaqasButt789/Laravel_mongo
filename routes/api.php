@@ -39,6 +39,9 @@ Route::group(['middleware'=>'cauth'],function(){
  */
 
 Route::post('/createpost',[PostController::class,'createPost']);
+
+
+
 /**
  * update post Route
  */
@@ -87,8 +90,8 @@ Route::post('/deletecomment',[UserCommentController::class,'deleteComment']);
 /**
  * logout route
  */
-
 Route::post('/logout',[UserController::class,'logOut']);
+
 
 
 Route::post('/getpost',[UserController::class,'getPostDetails']);
@@ -119,7 +122,7 @@ Route::post('/signup',[UserController::class,'userSignup']);
  * login route
  */
 
-Route::post('/login',[UserController::class,'userLogin'])->middleware('eauth');
+Route::post('/login',[UserController::class,'userLogin']);
 
 
 /**
@@ -136,3 +139,4 @@ Route::post('/forgetpassword',[ForgetController::class,'forgetPassword']);
  * Change Password route
  */
 Route::post('/changepassword',[ForgetController::class,'changePassword']);
+

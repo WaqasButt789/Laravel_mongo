@@ -27,7 +27,7 @@ class CreatePostRequest extends FormRequest
     public function rules()
     {
         return [
-            'file'=>'required|mimes:png,jpg,jpeg,gif,doc,pdf,txt,mp4,mov,wav|max:5000',
+            'file'=>'mimes:png,jpg,jpeg,gif,doc,pdf,txt,mp4,mov,wav|max:5000',
             'access' => 'required|in:public,private,Public,Private',
             'token' => 'required'
         ];

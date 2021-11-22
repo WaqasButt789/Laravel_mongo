@@ -24,7 +24,7 @@ class DeletePostRequest extends FormRequest
     public function rules()
     {
         return [
-            'pid' => 'required|integer',
+            'pid' => 'required',
             'token' => 'required'
         ];
     }

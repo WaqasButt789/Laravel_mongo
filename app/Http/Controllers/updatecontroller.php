@@ -3,31 +3,39 @@
 namespace App\Http\Controllers;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
+use App\Services\DataBaseConnectionService;
+
 use Illuminate\Http\Request;
 
 class updatecontroller extends Controller
 {
     /**
-     * 
-     * updating Email_verified_at field 
+     *
+     * updating Email_verified_at field
      */
     public function updateData($email,$token)
     {
-       //$em=Crypt::decryptString($email);
-
-       //echo $em;
-      
-
-        $data = DB::table('users')->where('email',$email)->where('token',$token)->get();
-        $count=count($data);
-        if($count>0)
-        {
-            DB::table('users')->where('token',$token)->update(['email_verified_at'=>now()]);
-            return "Your Email is Verified";
-        }
-        else{
-            return "Your Email is not Verified";
-        }
-
+            $coll = new DataBaseConnectionService();
+            $table = 'users';
+            $coll2 = $coll->connection($table);
+            $insert = $coll2->findOne([
+                'email' => $email,
+                'token' => (int)$token
+             ]);
+             //$objects = json_decode(json_encode($insert->toArray(),true));
+             dd($insert);
+            if($insert)
+                {
+                     $update = $coll2->updateMany(array("email"=>$email),
+                    array('$set'=>array('email_verified' => true,
+                    'updated_at' =>new \MongoDB\BSON\UTCDateTime(new \DateTime('now')))));
+                    return response(['Message'=>'Your Email has been Verified']);
+                }
+                else
+                {
+                    return response(['Message' => 'your email is not verified..!!!']);
+                }
     }
+
 }
+

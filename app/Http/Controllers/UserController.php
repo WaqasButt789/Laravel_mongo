@@ -10,11 +10,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\DataBaseConnectionService;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use App\Http\Requests\SignUpRequest;
 use App\Http\Requests\LogInRequest;
 use App\Http\Requests\UpdateUserRequest;
+
 
 
 class UserController extends Controller
@@ -24,25 +26,31 @@ class UserController extends Controller
      */
     public function userSignup(SignUpRequest $req)
     {
-        try{
-            $req->validated();
-            $user=new User;
-            $user->name=$req->name;
-            $user->email=$req->email;
-            $user->password=Hash::make($req->password);
-            $user->gender=$req->gender;
-            $user->status=$req->status;
-            $user->token =$token = rand(100,1000);
-            $user->save();    
-            $mail=$req->email;
-            $this->sendmail($mail,$token);
-            return $user;
-        }catch(Exception $ex){
-            return response()->json(['Error'=>$ex->getMessage()]);
-        }
+        $coll=new DataBaseConnectionService();
+        $table='users';
+        $coll2=$coll->connection($table);
+        $req->validated();
+        $name=$req->name;
+        $email=$req->email;
+        $password=Hash::make($req->password);
+        $gender=$req->gender;
+        $status=0;
+        $token =$token = rand(100,1000);
+        $mail=$req->email;
+        $insert=$coll2->insertOne([
+            'name'=>$name,
+            'email'=>$email,
+            'password'=>$password,
+            'gender'=>$gender,
+            'status'=>$status,
+            'token'=>$token,
+            'email_verified'=>FALSE
+        ]);
+        $this->sendmail($mail,$token);
+        return response()->json(["message"=>"plese verify your email to proceed further"]);
     }
       ////sending mail function
-     
+
     public function sendmail($mail,$token)
     {
         $details=[
@@ -60,18 +68,20 @@ class UserController extends Controller
     {
         $email=$req->email;
         $password=$req->password;
-        $data = DB::table('users')->where('email',$email)->get();
-        $emaildata = DB::table('users')->select('email_verified_at')->where('email',$email)->get();
-        
-        if($emaildata[0]->email_verified_at!=NULL)
-        {
-            $dpsw = $data[0]->password;
-            $count = count($data);
-    
-            //checking hash password with simple 
+        $coll = new DataBaseConnectionService();
+        $table = 'users';
+        $coll2 = $coll->connection($table);
+        // $data=$coll2->findOne([
+        //     'email' => $email
+        // ],['projection' => ['email_verified' => 1]]);
 
+        $data=$coll2->findOne([
+                'email' => $email
+         ]);
+
+        if($data->email_verified == true){
+            $dpsw = $data->password;
             if (Hash::check($password, $dpsw)) {
-    
                 $key = "waqas-123";
                 $payload = array(
                     "iss" => "localhost",
@@ -80,15 +90,17 @@ class UserController extends Controller
                     "nbf" => 1357000000
                 );
                 $token = JWT::encode($payload, $key, 'HS256');
-                DB::table('users')->where('email',$email)->update(['status'=>true]);
-                DB::table('users')->where('email',$email)->update(['remember_token'=>$token]);
-                return response()->json(['access_token'=>$token , 'message'=> 'successfuly login']); 
+                $coll2->updateOne(
+                    [ 'email' => $email ],
+                    [ '$set' => [ 'status' => 1 ,'remember_token' => $token]]
+                 );
+                return response()->json(['access_token'=>$token , 'message'=> 'successfuly login']);
               }
             else{
                 return "your credentials are not valid";
-            } 
+            }
         }
-        else if($emaildata[0]->email_verified_at==NULL)
+        else
         {
             echo "your email is not vreified";
         }
@@ -99,21 +111,24 @@ class UserController extends Controller
     public function updateUser(UpdateUserRequest $req)
     {
         $key=$req->token;
-        $pid=$req->pid;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows>0)
+        $coll = new DataBaseConnectionService();
+        $table = 'users';
+        $coll2 = $coll->connection($table);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        if($data!=NULL)
         {
+            $uid=$data->_id;
+            $name=$req->name;
             $password=Hash::make($req->password);
-            $uid=$data[0]->uid;
-            $updateDetails = [
-                'name' => $req->name,
-                'password' => $password
-            ];
-            DB::table('users')->where('uid',$uid)->update($updateDetails);
+            $gender=$req->gender;
+            $coll2->updateOne(
+                [ '_id' => $uid ],
+                [ '$set' => [ 'name' => $name ,'password' => $password , 'gender'=> $gender]]
+            );
             return response()->json(["messsage" => "user data updated successfuly"]);
         }
-        else{
+        else
+        {
             return response()->json(["messsage" => "you are not login"]);
         }
     }
@@ -125,12 +140,16 @@ class UserController extends Controller
     public function logOut(Request $req)
     {
         $key=$req->token;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows>0)
+        $coll = new DataBaseConnectionService();
+        $table = 'users';
+        $coll2 = $coll->connection($table);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        if($data!=NULL)
         {
-            DB::table('users')->where('remember_token',$key)->update(['status'=>false]);
-            DB::table('users')->where('remember_token',$key)->update(['remember_token'=>NULL]);
+            $coll2->updateOne(
+                [ 'remember_token' => $key ],
+                [ '$set' => [ 'status' => 0 ,'remember_token' => NULL]]
+            );
             return response()->json(['message'=>'logout successfuly']);
         }
         else{
@@ -143,17 +162,15 @@ class UserController extends Controller
     public function getUserData(Request $req)
     {
         $key=$req->token;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows>0)
-        {
-            $uid=$data[0]->uid;
-            $data=DB::table('users')->select('name','email','gender')->where('uid',$uid)->get();
-            return response(['message'=>$data]);
-        }
-        else{
-            return response(['message'=>'you are not login or authenticated user']);
-        }
+        $coll = new DataBaseConnectionService();
+        $table = 'users';
+        $coll2 = $coll->connection($table);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        $userdata=$coll2->findOne([
+            '_id' => $uid
+        ],['projection' => ['name' => 1 ,'email' => 1 ,'gender' => 1 ,]]);
+        return response(['message'=>$userdata]);
      }
      /**
       * get all posts aginst a user

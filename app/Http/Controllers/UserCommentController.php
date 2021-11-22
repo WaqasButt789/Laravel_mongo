@@ -1,10 +1,9 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\comment;
+use App\Services\DataBaseConnectionService;
 
 class UserCommentController extends Controller
 {
@@ -13,35 +12,45 @@ class UserCommentController extends Controller
      */
     public function createComment(Request $req)
     {
-
+        // $table='users';
+        // $conn=get_mongo_connection($table);
+        //dd($conn);
         $key=$req->token;
         $pid=$req->pid;
-        $comment=$req->comment;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows>0)
+        $coll = new DataBaseConnectionService();
+        $utable ='users';
+        $coll2 = $coll->connection($utable);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+
+        $uid=$data->_id;
+        // $utable ='posts';
+        // $coll3 = $coll->connection($utable);
+        // $id = new \MongoDB\BSON\ObjectId($pid);
+        // $data=$coll3->findOne(['_id' => $id ]);
+        if($req->comment !=NULL)
         {
-            $comments=new comment;
-            $uid=$data[0]->uid;
-            
-               
-            $path = $req->file('file')->store('post');    
-
-            
-
-            $comments->user_id=$uid;
-            $comments->p_id=$pid;
-            $comments->comment=$comment;
-            $comments->file=$path;
-            $comments->save();
-            return response()->json(['message'=>'Commented Successfuly']);
-
-
+            $comment=$req->comment;
         }
         else{
-
-            return response()->json(['message'=>'you are not login']);
+            $comment=NULL;
         }
+        if( $req->file('file')!=NULL)
+        {
+            $path = $req->file('file')->store('post');
+            $file=$path;
+        }
+        else{
+            $file=NULL;
+        }
+        $ptable = 'comments';
+        $coll2 = $coll->connection($ptable);
+        $insert=$coll2->insertOne([
+            'uid'=>$uid,
+            'pid'=>$pid,
+            'file'=>$file,
+            'comment'=>$comment
+        ]);
+        return response()->json(['message'=>'commented successfuly']);
     }
 
     /**
@@ -49,40 +58,45 @@ class UserCommentController extends Controller
      */
     public function updateComment(Request $req)
     {
-
         $key=$req->token;
-        $pid=$req->pid;
-        $comment=$req->comment;
         $cid=$req->cid;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows>0){
-        $uid=$data[0]->uid;
-        $path = $req->file('file')->store('post');
-           
-
-            $updateDetails = [
-                'user_id' => $uid,
-                'file' => $path,
-                'comment'=> $comment
-            ];
-          if(DB::table('comments')->where(['cid'=> $cid,'user_id'=> $uid])->update($updateDetails)==1)
+        $coll = new DataBaseConnectionService();
+        $utable ='users';
+        $coll2 = $coll->connection($utable);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        $utable ='comments';
+        $coll2 = $coll->connection($utable);
+        $ccid = new \MongoDB\BSON\ObjectId($cid);
+        $data=$coll2->findOne(['_id' => $ccid ]);
+        $uid_from_comments=$data->uid;
+        if($uid_from_comments == $uid )
+        {
+            if($req->comment !=NULL)
             {
-           
-
-            return response()->json(["messsage" => "comment updated successfuly"]);
+                $comment=$req->comment;
             }
             else{
-
-                return response()->json(["messsage" => "you cannot update others comments"]);
-
+                $comment=NULL;
             }
+            if( $req->file('file')!=NULL)
+            {
+                $path = $req->file('file')->store('post');
+                $file=$path;
+            }
+            else{
+                $file=NULL;
+            }
+            $ptable = 'comments';
+            $collection = $coll->connection($ptable);
+            $collection->updateOne(
+                [ '_id' => $ccid ],
+                [ '$set' => ['user_id' => $uid,'file' => $file,'comment'=> $comment]]
+            );
+            return response()->json(["messsage" => "Comment updated successfuly"]);
         }
-
         else{
-
-            return response()->json(["messsage" => "you are not login"]);
-
+            return response()->json(["messsage" => "You are not allowed to update this comment"]);
         }
     }
 
@@ -91,31 +105,25 @@ class UserCommentController extends Controller
      */
     public function deleteComment(Request $req)
     {
-
         $key=$req->token;
         $cid=$req->cid;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows>0){
-            $uid=$data[0]->uid;
-            
-            if(DB::table('comments')->where(['cid'=> $cid,'user_id'=> $uid])->delete() == 1)
-            {
-                
-                return response()->json(["messsage" => "comment Deleted successfuly"]);
-            
-            }
-
-            else{
-
-                return response()->json(["messsage" => "you are ot allowed to delete others comment"]);
-
-            }
-             
-           
+        $coll = new DataBaseConnectionService();
+        $utable ='users';
+        $coll2 = $coll->connection($utable);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        $utable ='comments';
+        $coll2 = $coll->connection($utable);
+        $ccid = new \MongoDB\BSON\ObjectId($cid);
+        $data=$coll2->findOne(['_id' => $ccid ]);
+        $uid_from_comments=$data->uid;
+        if($uid_from_comments == $uid )
+        {
+            $coll2->deleteOne(['_id' => $ccid]);
+            return response()->json(["messsage" => "Comment Deleted successfuly"]);
         }
         else{
-            return response()->json(["messsage" => "you are not login"]);
+            return response()->json(["messsage" => "You are not allowed to delete this comment"]);
         }
     }
 }

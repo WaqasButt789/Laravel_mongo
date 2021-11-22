@@ -8,6 +8,12 @@ use App\Http\Requests\CreatePostRequest;
 use App\Http\Requests\DeletePostRequest;
 use App\Http\Requests\ReadPostRequest;
 use Illuminate\Http\Request;
+use App\Services\DataBaseConnectionService;
+use App\Helpers\helper;
+
+use function App\Helpers\get_mongo_connection;
+
+//use MongoDB\BSON\ObjectId;
 
 class PostController extends Controller
 {
@@ -17,22 +23,29 @@ class PostController extends Controller
     public function createPost(CreatePostRequest $req)
     {
         $key=$req->token;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows == 1)
+        $coll = new DataBaseConnectionService();
+        $utable = 'users';
+        $coll2 = $coll->connection($utable);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        $user_id=$uid;
+        if($req->file('file')!=NULL)
         {
-            $uid=$data[0]->uid;
-            $post = new post;
-            $post->user_id=$uid;
             $path = $req->file('file')->store('post');
-            $post->file = $path;
-            $post->accessors=$req->access;
-            $post->save();
-            return response()->json(['message'=>'post created successfuly']);
-         }
-        else{
-            return response()->json(['message'=>'you are not authenticated user']);
+            $file = $path;
         }
+        else{
+            return response()->json(['message'=>'Please Provide a file to create post successfuly']);
+        }
+        $accessors=$req->access;
+        $ptable = 'posts';
+        $coll2 = $coll->connection($ptable);
+        $insert=$coll2->insertOne([
+            'user_id'=>$user_id,
+            'file'=>$file,
+            'accessors'=>$accessors
+        ]);
+        return response()->json(['message'=>'post created successfuly']);
     }
 
     /**
@@ -42,22 +55,27 @@ class PostController extends Controller
     {
         $key=$req->token;
         $pid=$req->pid;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows>0)
-        {
-            $uid=$data[0]->uid;
-            DB::table('comments')->where('p_id',$pid)->delete();
-            if(DB::table('posts')->where('pid',$pid)->delete()==1)
-            {
-                return response()->json(["messsage" => "Post deleted successfuly"]);
-            }
-            else{
-                return response()->json(["messsage" => "You are not allowed to delete this post"]);
-            }
+        $coll = new DataBaseConnectionService();
+        $utable ='users';
+        $coll2 = $coll->connection($utable);
+        // $table='users';
+        // $conn=get_mongo_connection($table);
+        //dd($conn);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        $ptable = 'posts';
+        $check_user_against_post = $coll->connection($ptable);
+        $id = new \MongoDB\BSON\ObjectId($pid);
+        $data=$check_user_against_post->findOne(['_id' => $id],['projection' => ['uid'=> 1]]);
+        $uid_from_database = $data->user_id;
+        if($uid == $uid_from_database ){
+            $ptable = 'posts';
+            $collection = $coll->connection($ptable);
+            $collection->deleteOne(['_id' => $id]);
+            return response()->json(["messsage" => "Post deleted successfuly"]);
         }
         else{
-            return response()->json(["messsage" => "you are not login so you cannot delete post"]);
+            return response()->json(["messsage" => "You are not allowed to delete this post"]);
         }
     }
     /**
@@ -66,25 +84,33 @@ class PostController extends Controller
 
     public function updatePost(Request $req)
     {
-
         $key=$req->token;
         $pid=$req->pid;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows>0)
-        {
-            $uid=$data[0]->uid;
-            $path = $req->file('file')->store('post');
-            $updateDetails = [
-                'user_id' => $uid,
-                'file' => $path,
-                'accessors' => $req->access
-            ];
-            DB::table('posts')->where('pid',$pid)->update($updateDetails);
+        $coll = new DataBaseConnectionService();
+        $utable ='users';
+        $coll2 = $coll->connection($utable);
+        // $table='users';
+        // $conn=get_mongo_connection($table);
+        //dd($conn);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        $user_id=$uid;
+        $ptable = 'posts';
+        $check_user_against_post = $coll->connection($ptable);
+        $id = new MongoDB\BSON\ObjectId($pid);
+        $data=$check_user_against_post->findOne(['_id' => $id],['projection' => ['user_id'=> 1]]);
+        $uid_from_database = $data->user_id;
+        if($uid == $uid_from_database ){
+            $ptable = 'posts';
+            $collection = $coll->connection($ptable);
+            $collection->updateOne(
+                [ '_id' => $id ],
+                [ '$set' => [ 'file' => $req->file ,'accessors' => $req->access]]
+            );
             return response()->json(["messsage" => "Post updated successfuly"]);
         }
         else{
-            return response()->json(["messsage" => "you are not login"]);
+            return response()->json(["messsage" => "You are not allowed to update this post"]);
         }
     }
 
@@ -94,19 +120,23 @@ class PostController extends Controller
     public function readPost(ReadPostRequest $req)
 
         {
-        $key=$req->token;
-        $pid=$req->pid;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $numrows=count($data);
-        if($numrows>0)
-        {
-            $uid=$data[0]->uid;
-            $data=DB::table('posts')->where('user_id',$uid)->get();
-            return response(['message'=>$data]);
-        }
-        else{
-            return response(['message'=>'you are not login or authenticated user']);
-        }
+            // $table='users';
+            // $conn=get_mongo_connection($table);
+            //dd($conn);
+
+            $key=$req->token;
+            $pid=$req->pid;
+            $coll = new DataBaseConnectionService();
+            $utable ='users';
+            $coll2 = $coll->connection($utable);
+            $data=$coll2->findOne(['remember_token' => $key ]);
+            $uid=$data->_id;
+            $utable ='posts';
+            $coll2 = $coll->connection($utable);
+            $data = $coll2->find(['user_id' => $uid]);
+            $objects = json_decode(json_encode($data->toArray(),true));
+            $array=json_decode(json_encode($objects),true);
+            return response([$array]);
     }
 }
 
