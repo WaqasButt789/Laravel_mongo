@@ -16,12 +16,9 @@ class UserCommentController extends Controller
         // $conn=get_mongo_connection($table);
         //dd($conn);
         $key=$req->token;
-        $pid=$req->pid;
+        $pid=new \MongoDB\BSON\ObjectId($req->pid);
         $coll = new DataBaseConnectionService();
-        $utable ='users';
-        $coll2 = $coll->connection($utable);
-        $data=$coll2->findOne(['remember_token' => $key ]);
-
+        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
         $uid=$data->_id;
         // $utable ='posts';
         // $coll3 = $coll->connection($utable);
@@ -37,19 +34,18 @@ class UserCommentController extends Controller
         if( $req->file('file')!=NULL)
         {
             $path = $req->file('file')->store('post');
-            $file=$path;
+
         }
         else{
-            $file=NULL;
+            $path=NULL;
         }
-        $ptable = 'comments';
-        $coll2 = $coll->connection($ptable);
-        $insert=$coll2->insertOne([
-            'uid'=>$uid,
-            'pid'=>$pid,
-            'file'=>$file,
-            'comment'=>$comment
-        ]);
+        $comment = array(
+            "_id" => new \MongoDB\BSON\ObjectId(),
+            "uid" => $data["_id"],
+            "file" => $path,
+            "comment" => $comment,
+        );
+        $coll->connection('posts')->updateOne(["_id" => $pid],['$push'=>["comments" => $comment]]);
         return response()->json(['message'=>'commented successfuly']);
     }
 
