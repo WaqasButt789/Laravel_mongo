@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use App\Models\post;
 use Illuminate\Support\Facades\DB;
 use App\Http\Requests\CreatePostRequest;
@@ -10,7 +9,6 @@ use App\Http\Requests\ReadPostRequest;
 use Illuminate\Http\Request;
 use App\Services\DataBaseConnectionService;
 use App\Helpers\helper;
-
 use function App\Helpers\get_mongo_connection;
 
 //use MongoDB\BSON\ObjectId;
@@ -118,25 +116,23 @@ class PostController extends Controller
      * read post function
      */
     public function readPost(ReadPostRequest $req)
-
-        {
-            // $table='users';
-            // $conn=get_mongo_connection($table);
-            //dd($conn);
-
-            $key=$req->token;
-            $pid=$req->pid;
-            $coll = new DataBaseConnectionService();
-            $utable ='users';
-            $coll2 = $coll->connection($utable);
-            $data=$coll2->findOne(['remember_token' => $key ]);
-            $uid=$data->_id;
-            $utable ='posts';
-            $coll2 = $coll->connection($utable);
-            $data = $coll2->find(['user_id' => $uid]);
-            $objects = json_decode(json_encode($data->toArray(),true));
-            $array=json_decode(json_encode($objects),true);
-            return response([$array]);
+    {
+        // $table='users';
+        // $conn=get_mongo_connection($table);
+        //dd($conn);
+        $key=$req->token;
+        $pid=$req->pid;
+        $coll = new DataBaseConnectionService();
+        $utable ='users';
+        $coll2 = $coll->connection($utable);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        $utable ='posts';
+        $coll2 = $coll->connection($utable);
+        $data = $coll2->find(['user_id' => $uid]);
+        $objects = json_decode(json_encode($data->toArray(),true));
+        $array=json_decode(json_encode($objects),true);
+        return response([$array]);
     }
 }
 

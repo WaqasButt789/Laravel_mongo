@@ -6,6 +6,7 @@ use App\Http\Requests\AddFriendRequest;
 use Illuminate\Support\Facades\DB;
 use App\Models\Friend;
 use Illuminate\Http\Request;
+use App\Services\DataBaseConnectionService;
 
 
 class FreindController extends Controller
@@ -13,31 +14,30 @@ class FreindController extends Controller
     public function addFriend(AddFriendRequest $req)
     {
         $key=$req->token;
-        $fid=$req->fid;
-        $data=DB::table('users')
-                    ->where('remember_token',$key)->get();
-        $uid=$data[0]->uid;
+        $coll = new DataBaseConnectionService();
+        $utable ='users';
+        $coll2 = $coll->connection($utable);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        $id=$req->fid;
+        $fid = new \MongoDB\BSON\ObjectId($id);
         if($uid != $fid)
-        { 
-            if(DB::table('users')->where('uid',$fid)->exists())
+        {
+            $check1=$coll2->findOne(['_id' =>$fid]);
+            if($check1!=NULL)
             {
-                if(DB::table('friends')
-                        ->where(['userid_1' => $uid , 'userid_2' => $fid])
-                        ->orwhere(['userid_1' => $fid , 'userid_2' => $uid])
-                        ->doesntExist())
+                $coll2 = $coll->connection("friends");
+                 $check2=$coll2->findOne(['$or' =>[['$and'=>[['user_id' => $uid],['Friend_id' => $fid]]]
+                ,['$and'=>[['user_id' => $fid],['Friend_id' => $uid]]]]]);
+                if($check2 == NULL)
                 {
-                    $numrows=count($data);
-                    if($numrows>0)
-                    {
-                        $friend=new Friend;
-                        $friend->userid_1=$uid;
-                        $friend->userid_2=$fid;
-                        $friend->save();
-                        return response()->json(["messsage" => "now you are friend of".$fid]);
-                    }
-                    else{
-                            return response()->json(["messsage" => "you are not login"]);
-                        }
+                  $userid=$uid;
+                  $friendid=$fid;
+                  $status="pending";
+                  $coll2->insertOne([
+                    'user_id'=>$userid,
+                    'Friend_id'=>$friendid]);
+                  return response()->json(["messsage" => "now you are friend of".$fid]);
                  }
                  else{
                         return response(["message" => "User with id = ".$fid." is already your friend"]);
@@ -55,12 +55,20 @@ class FreindController extends Controller
     public function removeFriend(Request $req)
     {
         $key=$req->token;
-        $fid=$req->fid;
-        $data=DB::table('users')->where('remember_token',$key)->get();
-        $uid=$data[0]->uid;
-        if(DB::table('friends')->where(['userid_1' => $uid , 'userid_2' => $fid])->delete() == 1)
+        $id=$req->fid;
+        $coll = new DataBaseConnectionService();
+        $utable ='users';
+        $coll2 = $coll->connection($utable);
+        $data=$coll2->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        $fid = new \MongoDB\BSON\ObjectId($id);
+        $check2=$coll->connection("friends")->findOne(['$or' =>[['$and'=>[['user_id' => $uid],['Friend_id' => $fid]]]
+       ,['$and'=>[['user_id' => $fid],['Friend_id' => $uid]]]]]);
+        if($check2 != NULL)
         {
-            return response(['Message' => 'Unfriend Successfuly']);
+            $data=$coll->connection("friends")->deleteOne(['$or' =>[['$and'=>[['user_id' => $uid],['Friend_id' => $fid]]]
+            ,['$and'=>[['user_id' => $fid],['Friend_id' => $uid]]]]]);
+            return response()->json(["messsage" => "Unfriend Successfuly"]);
         }
         else{
 
