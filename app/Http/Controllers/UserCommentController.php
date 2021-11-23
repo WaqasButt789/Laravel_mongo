@@ -34,7 +34,6 @@ class UserCommentController extends Controller
         if( $req->file('file')!=NULL)
         {
             $path = $req->file('file')->store('post');
-
         }
         else{
             $path=NULL;
@@ -55,40 +54,32 @@ class UserCommentController extends Controller
     public function updateComment(Request $req)
     {
         $key=$req->token;
-        $cid=$req->cid;
+        $cid=new \MongoDB\BSON\ObjectId($req->cid);
+        $pid=new \MongoDB\BSON\ObjectId($req->pid);
         $coll = new DataBaseConnectionService();
-        $utable ='users';
-        $coll2 = $coll->connection($utable);
-        $data=$coll2->findOne(['remember_token' => $key ]);
+        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
         $uid=$data->_id;
-        $utable ='comments';
-        $coll2 = $coll->connection($utable);
-        $ccid = new \MongoDB\BSON\ObjectId($cid);
-        $data=$coll2->findOne(['_id' => $ccid ]);
-        $uid_from_comments=$data->uid;
-        if($uid_from_comments == $uid )
+        if($req->comment !=NULL)
         {
-            if($req->comment !=NULL)
-            {
-                $comment=$req->comment;
-            }
-            else{
-                $comment=NULL;
-            }
-            if( $req->file('file')!=NULL)
-            {
-                $path = $req->file('file')->store('post');
-                $file=$path;
-            }
-            else{
-                $file=NULL;
-            }
-            $ptable = 'comments';
-            $collection = $coll->connection($ptable);
-            $collection->updateOne(
-                [ '_id' => $ccid ],
-                [ '$set' => ['user_id' => $uid,'file' => $file,'comment'=> $comment]]
-            );
+            $comment=$req->comment;
+        }
+        else{
+            $comment=NULL;
+        }
+        if( $req->file('file')!=NULL)
+        {
+            $path = $req->file('file')->store('post');
+            $file=$path;
+        }
+        else{
+            $file=NULL;
+        }
+        $ptable = 'posts';
+        $collection = $coll->connection($ptable);
+        $data=(array)$coll->connection('posts')->findOne(['_id' => $pid,'comments'=>['$elemMatch'=>['uid'=>$uid]]]);
+        if($data!=NULL){
+            $collection->updateOne(['_id' => $pid,'comments._id'=>$cid],
+            ['$set' => ['comments.$.comment'=>$comment ,'comments.$.file'=>$file]]);
             return response()->json(["messsage" => "Comment updated successfuly"]);
         }
         else{
@@ -96,30 +87,27 @@ class UserCommentController extends Controller
         }
     }
 
+
+
      /**
      * deleting an existing comment
      */
     public function deleteComment(Request $req)
     {
-        $key=$req->token;
-        $cid=$req->cid;
         $coll = new DataBaseConnectionService();
-        $utable ='users';
-        $coll2 = $coll->connection($utable);
-        $data=$coll2->findOne(['remember_token' => $key ]);
+        $key=$req->token;
+        $pid=new \MongoDB\BSON\ObjectId($req->pid);
+        $cid=new \MongoDB\BSON\ObjectId($req->cid);
+        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
         $uid=$data->_id;
-        $utable ='comments';
-        $coll2 = $coll->connection($utable);
-        $ccid = new \MongoDB\BSON\ObjectId($cid);
-        $data=$coll2->findOne(['_id' => $ccid ]);
-        $uid_from_comments=$data->uid;
-        if($uid_from_comments == $uid )
-        {
-            $coll2->deleteOne(['_id' => $ccid]);
+        $data=(array)$coll->connection('posts')->findOne(['_id' => $pid,'comments'=>['$elemMatch'=>['uid'=>$uid]]]);
+        if($data!=NULL){
+            $coll->connection('posts')->updateOne(['_id' => $pid, 'comments._id'=>$cid],
+             ['$pull'=>['comments'=>['_id'=>$cid]]]);
             return response()->json(["messsage" => "Comment Deleted successfuly"]);
         }
         else{
             return response()->json(["messsage" => "You are not allowed to delete this comment"]);
-        }
+            }
     }
 }

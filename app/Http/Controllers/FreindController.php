@@ -15,33 +15,32 @@ class FreindController extends Controller
     {
         $key=$req->token;
         $coll = new DataBaseConnectionService();
-        $utable ='users';
-        $coll2 = $coll->connection($utable);
-        $data=$coll2->findOne(['remember_token' => $key ]);
-        $uid=$data->_id;
-        $id=$req->fid;
-        $fid = new \MongoDB\BSON\ObjectId($id);
+        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;  // user id from users table
+        $fid = new \MongoDB\BSON\ObjectId($req->fid); // friend_id from post man parameters
         if($uid != $fid)
         {
-            $check1=$coll2->findOne(['_id' =>$fid]);
-            if($check1!=NULL)
+            $check1=$coll->connection('users')->findOne(['_id' =>$fid]);
+            if($check1!=NULL)   // checking whether user is registered on our application or not
             {
-                $coll2 = $coll->connection("friends");
-                 $check2=$coll2->findOne(['$or' =>[['$and'=>[['user_id' => $uid],['Friend_id' => $fid]]]
-                ,['$and'=>[['user_id' => $fid],['Friend_id' => $uid]]]]]);
+                $check2=(array)$coll->connection('users')->findOne(['_id' => $uid,'friends'=>['$elemMatch'=>['fid'=>$fid]]]);
                 if($check2 == NULL)
                 {
-                  $userid=$uid;
-                  $friendid=$fid;
-                  $status="pending";
-                  $coll2->insertOne([
-                    'user_id'=>$userid,
-                    'Friend_id'=>$friendid]);
-                  return response()->json(["messsage" => "now you are friend of".$fid]);
+                    $friend = array(
+                        "_id" => new \MongoDB\BSON\ObjectId(),
+                        "fid" => $fid
+                    );
+                    $coll->connection('users')->updateOne(["_id" => $uid],['$push'=>["friends" => $friend]]);
+                    $friend = array(
+                        "_id" => new \MongoDB\BSON\ObjectId(),
+                        "fid" => $uid
+                    );
+                    $coll->connection('users')->updateOne(["_id" => $fid],['$push'=>["friends" => $friend]]);
+                    return response()->json(["messsage" => "now you are friend of".$fid]);
                  }
                  else{
                         return response(["message" => "User with id = ".$fid." is already your friend"]);
-                     }
+                    }
             }
             else{
                     return response(["message" => "User with id = ".$fid." is not registerd on our application"]);
@@ -51,6 +50,11 @@ class FreindController extends Controller
                 return response(["message" => "you cannot be the friend of yourself"]);
              }
     }
+
+    // public function check_friends_or_not()
+    // {
+
+    // }
 
     public function removeFriend(Request $req)
     {
