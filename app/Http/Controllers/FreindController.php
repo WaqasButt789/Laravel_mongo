@@ -3,11 +3,8 @@
 namespace App\Http\Controllers;
 use Illuminate\Http\Requests;
 use App\Http\Requests\AddFriendRequest;
-use Illuminate\Support\Facades\DB;
-use App\Models\Friend;
 use Illuminate\Http\Request;
 use App\Services\DataBaseConnectionService;
-
 
 class FreindController extends Controller
 {
@@ -23,8 +20,7 @@ class FreindController extends Controller
             $check1=$coll->connection('users')->findOne(['_id' =>$fid]);
             if($check1!=NULL)   // checking whether user is registered on our application or not
             {
-                $check2=(array)$coll->connection('users')->findOne(['_id' => $uid,'friends'=>['$elemMatch'=>['fid'=>$fid]]]);
-                if($check2 == NULL)
+                if(!$this->is_friend($uid,$fid))
                 {
                     $friend = array(
                         "_id" => new \MongoDB\BSON\ObjectId(),
@@ -37,8 +33,8 @@ class FreindController extends Controller
                     );
                     $coll->connection('users')->updateOne(["_id" => $fid],['$push'=>["friends" => $friend]]);
                     return response()->json(["messsage" => "now you are friend of".$fid]);
-                 }
-                 else{
+                }
+                else{
                         return response(["message" => "User with id = ".$fid." is already your friend"]);
                     }
             }
@@ -50,33 +46,40 @@ class FreindController extends Controller
                 return response(["message" => "you cannot be the friend of yourself"]);
              }
     }
-
-    // public function check_friends_or_not()
-    // {
-
-    // }
+/**
+ * this will return true if the given id is the friend else return false
+ */
+    public function is_friend($uid,$fid)
+    {
+        $coll = new DataBaseConnectionService();
+        $check2=(array)$coll->connection('users')
+                ->findOne(['_id' => $uid,'friends'=>['$elemMatch'=>['fid'=>$fid]]]);
+        if($check2 == NULL)
+        {
+            return false;
+        }
+        else{
+            return true;
+        }
+    }
 
     public function removeFriend(Request $req)
     {
         $key=$req->token;
-        $id=$req->fid;
+        $fid = new \MongoDB\BSON\ObjectId($req->fid);
         $coll = new DataBaseConnectionService();
-        $utable ='users';
-        $coll2 = $coll->connection($utable);
-        $data=$coll2->findOne(['remember_token' => $key ]);
+        $data= $coll->connection('users')->findOne(['remember_token' => $key ]);
         $uid=$data->_id;
-        $fid = new \MongoDB\BSON\ObjectId($id);
-        $check2=$coll->connection("friends")->findOne(['$or' =>[['$and'=>[['user_id' => $uid],['Friend_id' => $fid]]]
-       ,['$and'=>[['user_id' => $fid],['Friend_id' => $uid]]]]]);
-        if($check2 != NULL)
+        if($this->is_friend($uid,$fid))
         {
-            $data=$coll->connection("friends")->deleteOne(['$or' =>[['$and'=>[['user_id' => $uid],['Friend_id' => $fid]]]
-            ,['$and'=>[['user_id' => $fid],['Friend_id' => $uid]]]]]);
-            return response()->json(["messsage" => "Unfriend Successfuly"]);
+            $coll->connection('users')->updateOne(['_id' => $uid, 'friends.fid'=>$fid],
+             ['$pull'=>['friends'=>['fid'=>$fid]]]);
+            $coll->connection('users')->updateOne(['_id' => $fid, 'friends.fid'=>$uid],
+             ['$pull'=>['friends'=>['fid'=>$uid]]]);
+             return response()->json(["messsage" => "Unfriend Successfuly"]);
         }
         else{
-
-            return response(['Message' => 'You are not the friend of '.$fid]);
-        }
+             return response(['Message' => 'You are not the friend of '.$fid]);
+           }
     }
 }

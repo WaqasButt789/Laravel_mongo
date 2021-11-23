@@ -18,8 +18,7 @@ class UserCommentController extends Controller
         $key=$req->token;
         $pid=new \MongoDB\BSON\ObjectId($req->pid);
         $coll = new DataBaseConnectionService();
-        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
-        $uid=$data->_id;
+        $uid=$this->return_uid($key);
         // $utable ='posts';
         // $coll3 = $coll->connection($utable);
         // $id = new \MongoDB\BSON\ObjectId($pid);
@@ -57,8 +56,7 @@ class UserCommentController extends Controller
         $cid=new \MongoDB\BSON\ObjectId($req->cid);
         $pid=new \MongoDB\BSON\ObjectId($req->pid);
         $coll = new DataBaseConnectionService();
-        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
-        $uid=$data->_id;
+        $uid=$this->return_uid($key);
         if($req->comment !=NULL)
         {
             $comment=$req->comment;
@@ -98,8 +96,7 @@ class UserCommentController extends Controller
         $key=$req->token;
         $pid=new \MongoDB\BSON\ObjectId($req->pid);
         $cid=new \MongoDB\BSON\ObjectId($req->cid);
-        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
-        $uid=$data->_id;
+        $uid=$this->return_uid($key);
         $data=(array)$coll->connection('posts')->findOne(['_id' => $pid,'comments'=>['$elemMatch'=>['uid'=>$uid]]]);
         if($data!=NULL){
             $coll->connection('posts')->updateOne(['_id' => $pid, 'comments._id'=>$cid],
@@ -109,5 +106,14 @@ class UserCommentController extends Controller
         else{
             return response()->json(["messsage" => "You are not allowed to delete this comment"]);
             }
+    }
+
+    public function return_uid($key)
+    {
+        $coll = new DataBaseConnectionService();
+        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        return $uid;
+
     }
 }

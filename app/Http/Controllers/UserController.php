@@ -27,8 +27,6 @@ class UserController extends Controller
     public function userSignup(SignUpRequest $req)
     {
         $coll=new DataBaseConnectionService();
-        $table='users';
-        $coll2=$coll->connection($table);
         $req->validated();
         $name=$req->name;
         $email=$req->email;
@@ -37,7 +35,7 @@ class UserController extends Controller
         $status=0;
         $token =$token = rand(100,1000);
         $mail=$req->email;
-        $insert=$coll2->insertOne([
+        $insert=$coll->connection('users')->insertOne([
             'name'=>$name,
             'email'=>$email,
             'password'=>$password,
@@ -69,13 +67,11 @@ class UserController extends Controller
         $email=$req->email;
         $password=$req->password;
         $coll = new DataBaseConnectionService();
-        $table = 'users';
-        $coll2 = $coll->connection($table);
         // $data=$coll2->findOne([
         //     'email' => $email
         // ],['projection' => ['email_verified' => 1]]);
 
-        $data=$coll2->findOne([
+        $data=$coll->connection('users')->findOne([
                 'email' => $email
          ]);
 
@@ -90,7 +86,7 @@ class UserController extends Controller
                     "nbf" => 1357000000
                 );
                 $token = JWT::encode($payload, $key, 'HS256');
-                $coll2->updateOne(
+                $coll->connection('users')->updateOne(
                     [ 'email' => $email ],
                     [ '$set' => [ 'status' => 1 ,'remember_token' => $token]]
                  );
@@ -112,16 +108,14 @@ class UserController extends Controller
     {
         $key=$req->token;
         $coll = new DataBaseConnectionService();
-        $table = 'users';
-        $coll2 = $coll->connection($table);
-        $data=$coll2->findOne(['remember_token' => $key ]);
+        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
         if($data!=NULL)
         {
             $uid=$data->_id;
             $name=$req->name;
             $password=Hash::make($req->password);
             $gender=$req->gender;
-            $coll2->updateOne(
+            $coll->connection('users')->updateOne(
                 [ '_id' => $uid ],
                 [ '$set' => [ 'name' => $name ,'password' => $password , 'gender'=> $gender]]
             );
@@ -141,12 +135,10 @@ class UserController extends Controller
     {
         $key=$req->token;
         $coll = new DataBaseConnectionService();
-        $table = 'users';
-        $coll2 = $coll->connection($table);
-        $data=$coll2->findOne(['remember_token' => $key ]);
+        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
         if($data!=NULL)
         {
-            $coll2->updateOne(
+            $coll->connection('users')->updateOne(
                 [ 'remember_token' => $key ],
                 [ '$set' => [ 'status' => 0 ,'remember_token' => NULL]]
             );
@@ -163,11 +155,9 @@ class UserController extends Controller
     {
         $key=$req->token;
         $coll = new DataBaseConnectionService();
-        $table = 'users';
-        $coll2 = $coll->connection($table);
-        $data=$coll2->findOne(['remember_token' => $key ]);
+        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
         $uid=$data->_id;
-        $userdata=$coll2->findOne([
+        $userdata=$coll->connection('users')->findOne([
             '_id' => $uid
         ],['projection' => ['name' => 1 ,'email' => 1 ,'gender' => 1 ,]]);
         return response(['message'=>$userdata]);
@@ -178,17 +168,23 @@ class UserController extends Controller
     public function getPostDetails(Request $req)
     {
         $key=$req->token;
-        if($key!=NULL)
-        {
-            $data=DB::table('users')->where('remember_token', $key)->get();
-            $uid=$data[0]->uid;
-            //$d1=user::with('getPostDetails')->where('uid',$uid)->get();
-            $users = User::with(['getPostDetails', 'getPostComments'])->where('uid',$uid)->get();
-            return response(["message" => $users]);
-        }
-        else
-        {
-            return response(["message"=>"Please provide a token"]);
-        }
+        $uid=$uid=$this->return_uid($key);
+        $coll = new DataBaseConnectionService();
+        $usersPosts=$coll->connection('posts')->find([
+            'user_id' => $uid
+        ]);
+        $AllPostsOfUser=$usersPosts->toArray();
+        return response([$AllPostsOfUser]);
     }
+
+    public function return_uid($key)
+    {
+        $coll = new DataBaseConnectionService();
+        $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
+        $uid=$data->_id;
+        return $uid;
+
+    }
+
+
 }
