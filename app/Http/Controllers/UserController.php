@@ -16,7 +16,7 @@ use Firebase\JWT\Key;
 use App\Http\Requests\SignUpRequest;
 use App\Http\Requests\LogInRequest;
 use App\Http\Requests\UpdateUserRequest;
-use App\Services\DataBaseConnectionService;
+
 
 
 
@@ -37,7 +37,7 @@ class UserController extends Controller
         $status=0;
         $token =$token = rand(100,1000);
         $mail=$req->email;
-        $insert=$coll->connection('users')->insertOne([
+        $coll->connection('users')->insertOne([
             'name'=>$name,
             'email'=>$email,
             'password'=>$password,
@@ -113,7 +113,6 @@ class UserController extends Controller
         $data=$coll->connection('users')->findOne(['remember_token' => $key ]);
         if($data!=NULL)
         {
-            use App\Services\DataBaseConnectionService;
             $uid=$data->_id;
             $name=$req->name;
             $password=Hash::make($req->password);
