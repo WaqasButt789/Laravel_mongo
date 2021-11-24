@@ -85,8 +85,6 @@ class UserCommentController extends Controller
         }
     }
 
-
-
      /**
      * deleting an existing comment
      */

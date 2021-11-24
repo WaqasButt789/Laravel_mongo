@@ -15,20 +15,28 @@ use App\Http\Requests\ForgetPasswordRequest;
 use App\Http\Requests\ChangePasswordRequest;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Validator;
+use App\Services\DataBaseConnectionService;
 
 class ForgetController extends Controller
 {
     public function forgetPassword(ForgetPasswordRequest $req)
     {
         $email=$req->email;
-        if(DB::table('users')->where('email',$email)->exists())
+        $coll = new DataBaseConnectionService();
+        $check2=(array)$coll->connection('users')
+                ->findOne(['email' => $email]);
+
+        if($check2!=NULL)
         {
             $key = rand(100,1000);
             $details=[
                 'title' => 'Please Use This OTP : '. $key,
-                'body' => ' '   
+                'body' => ' '
             ];
-            DB::table('users')->where('email',$email)->update(['token'=>$key]);
+            $coll->connection('users')->updateOne(
+                [ 'email'=> $email ],
+                [ '$set' => ['token'=>$key]]
+            );
             Mail::to($email)->send(new TestMail($details));
             return response(["message"=>"We have sent an OTP to your registered email Please verify yourself"]);
         }
@@ -42,13 +50,23 @@ class ForgetController extends Controller
     {
         $email=$req->email;
         $newpassword=$req->newpassword;
-        $token=$req->token;
-        if(DB::table('users')->where('email',$email)->exists())
+        $token=(int)$req->token;
+        $coll = new DataBaseConnectionService();
+        $check2=(array)$coll->connection('users')
+                ->findOne(['email' => $email]);
+
+        if($check2!=NULL)
         {
-            if(DB::table('users')->where(['email'=> $email , 'token' => $token])->exists())
+            $check3=(array)$coll->connection('users')
+                ->findOne(['email' => $email , 'token' => $token]);
+          
+            if($check3!=NULL)
             {
                 $pass=Hash::make($newpassword);
-                DB::table('users')->where('email',$email)->update(['password'=>$pass]);
+                $coll->connection('users')->updateOne(
+                    [ 'email'=> $email ],
+                    [ '$set' => ['password' => $pass]]
+                );
                 return response(['message' => 'Password changed successfuly']);
             }
             else
@@ -60,5 +78,5 @@ class ForgetController extends Controller
         {
             return response(['message' => 'Provided Email is Not Valid']);
         }
-    }   
+    }
 }

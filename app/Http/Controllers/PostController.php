@@ -47,7 +47,7 @@ class PostController extends Controller
     }
 
     /**
-     * delete post controller
+     * delete post 
      */
     public function deletePost(DeletePostRequest $req)
     {
